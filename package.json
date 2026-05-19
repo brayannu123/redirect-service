@@ -6,7 +6,7 @@
   "scripts": {
     "build": "node esbuild.config.mjs && cd dist && powershell Compress-Archive -Path index.js -DestinationPath index.zip -Force",
     "deploy": "npm run build && cd terraform && terraform apply -auto-approve",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"No automated tests configured\""
   },
   "keywords": [],
   "author": "",

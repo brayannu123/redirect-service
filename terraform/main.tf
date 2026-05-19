@@ -11,8 +11,8 @@ resource "aws_iam_role" "lambda_role" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
       Principal = { Service = "lambda.amazonaws.com" }
     }]
   })
@@ -68,6 +68,13 @@ resource "aws_lambda_function" "redirect" {
 resource "aws_apigatewayv2_api" "main" {
   name          = "${var.project_name}-api-${var.environment}"
   protocol_type = "HTTP"
+
+  cors_configuration {
+    allow_headers = ["Content-Type"]
+    allow_methods = ["GET", "OPTIONS"]
+    allow_origins = ["*"]
+    max_age       = 300
+  }
 }
 
 resource "aws_apigatewayv2_stage" "dev" {

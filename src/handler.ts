@@ -7,90 +7,86 @@ const docClient = DynamoDBDocumentClient.from(client);
 
 const TABLE_NAME = process.env.TABLE_NAME;
 
-export const handler = async (
-  event: APIGatewayProxyEventV2
-): Promise<APIGatewayProxyResultV2> => {
-  console.log('Event:', JSON.stringify(event, null, 2));
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'GET,OPTIONS',
+};
 
-  // 1. Obtener shortId desde la URL
-  const shortId = event.pathParameters?.shortId;
+const jsonResponse = (statusCode: number, body: Record<string, unknown>): APIGatewayProxyResultV2 => ({
+  statusCode,
+  headers: {
+    'Content-Type': 'application/json',
+    ...corsHeaders,
+  },
+  body: JSON.stringify(body),
+});
 
-  // 2. Validar que exista
-  if (!shortId) {
+export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
+  const method = event.requestContext?.http?.method;
+  if (method === 'OPTIONS') {
     return {
-      statusCode: 400,
-      body: JSON.stringify({
-        message: 'shortId is required',
-      }),
+      statusCode: 204,
+      headers: corsHeaders,
+      body: '',
     };
   }
 
+  if (!TABLE_NAME) {
+    return jsonResponse(500, { message: 'TABLE_NAME is not configured' });
+  }
+
+  const shortId = event.pathParameters?.shortId;
+  if (!shortId) {
+    return jsonResponse(400, { message: 'shortId is required' });
+  }
+
   try {
-    // 3. Consultar DynamoDB
-    const command = new GetCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        shortId: shortId,
-      },
-    });
+    const response = await docClient.send(
+      new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { shortId },
+      })
+    );
 
-    const response = await docClient.send(command);
-    console.log("Dynamo response:", JSON.stringify(response, null, 2));
+    if (!response.Item) {
+      return jsonResponse(404, {
+        error: 'Not Found',
+        message: 'The requested short link does not exist.',
+      });
+    }
 
-    // 4. Verificar si existe el registro
-    if (response.Item) {
-      const originalUrl = response.Item.originalUrl;
+    const originalUrl = response.Item.originalUrl;
+    const timestamp = new Date().toISOString();
 
-      console.log(`Redirecting ${shortId} to ${originalUrl}`);
-
-      // Incrementar clicks y agregar la fecha de la visita a la lista
-      try {
-        const timestamp = new Date().toISOString();
-        const updateCommand = new UpdateCommand({
+    try {
+      await docClient.send(
+        new UpdateCommand({
           TableName: TABLE_NAME,
-          Key: {
-            shortId: shortId,
-          },
-          UpdateExpression: 'SET clicks = if_not_exists(clicks, :zero) + :inc, visits = list_append(if_not_exists(visits, :empty_list), :new_visit)',
+          Key: { shortId },
+          UpdateExpression:
+            'SET clicks = if_not_exists(clicks, :zero) + :inc, visits = list_append(if_not_exists(visits, :empty_list), :new_visit)',
           ExpressionAttributeValues: {
             ':zero': 0,
             ':inc': 1,
             ':new_visit': [timestamp],
             ':empty_list': [],
           },
-        });
-        await docClient.send(updateCommand);
-        console.log(`Successfully updated click stats for ${shortId}`);
-      } catch (dbError) {
-        console.error('Error updating click stats in DynamoDB:', dbError);
-      }
-
-      // 5. Redirección HTTP 302
-      return {
-        statusCode: 302,
-        headers: {
-          Location: originalUrl,
-          'Access-Control-Allow-Origin': '*',
-        },
-      };
+        })
+      );
+    } catch (dbError) {
+      console.error('Error updating click stats in DynamoDB:', dbError);
     }
 
-    // 6. Si no existe
     return {
-      statusCode: 404,
-      body: JSON.stringify({
-        error: 'Not Found',
-        message: 'The requested short link does not exist.',
-      }),
+      statusCode: 302,
+      headers: {
+        Location: originalUrl,
+        ...corsHeaders,
+      },
     };
   } catch (error) {
     console.error('Error querying DynamoDB:', error);
-
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        message: 'Internal Server Error',
-      }),
-    };
+    return jsonResponse(500, { message: 'Internal Server Error' });
   }
 };
