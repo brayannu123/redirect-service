@@ -1,0 +1,24 @@
+{
+  "name": "redirect-service",
+  "version": "1.0.0",
+  "description": "Serverless service to redirect short URLs to original URLs",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "node esbuild.config.mjs && cd dist && powershell Compress-Archive -Path index.js -DestinationPath index.zip -Force",
+    "deploy": "npm run build && cd terraform && terraform apply -auto-approve",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.577.0",
+    "@aws-sdk/lib-dynamodb": "^3.577.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.138",
+    "@types/node": "^20.12.12",
+    "esbuild": "^0.21.3",
+    "typescript": "^5.4.5"
+  }
+}
