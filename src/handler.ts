@@ -35,6 +35,7 @@ export const handler = async (
     });
 
     const response = await docClient.send(command);
+    console.log("Dynamo response:", JSON.stringify(response, null, 2));
 
     // 4. Verificar si existe el registro
     if (response.Item) {
