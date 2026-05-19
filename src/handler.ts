@@ -1,6 +1,6 @@
 import { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
@@ -41,6 +41,28 @@ export const handler = async (
       const originalUrl = response.Item.originalUrl;
 
       console.log(`Redirecting ${shortId} to ${originalUrl}`);
+
+      // Incrementar clicks y agregar la fecha de la visita a la lista
+      try {
+        const timestamp = new Date().toISOString();
+        const updateCommand = new UpdateCommand({
+          TableName: TABLE_NAME,
+          Key: {
+            shortId: shortId,
+          },
+          UpdateExpression: 'SET clicks = if_not_exists(clicks, :zero) + :inc, visits = list_append(if_not_exists(visits, :empty_list), :new_visit)',
+          ExpressionAttributeValues: {
+            ':zero': 0,
+            ':inc': 1,
+            ':new_visit': [timestamp],
+            ':empty_list': [],
+          },
+        });
+        await docClient.send(updateCommand);
+        console.log(`Successfully updated click stats for ${shortId}`);
+      } catch (dbError) {
+        console.error('Error updating click stats in DynamoDB:', dbError);
+      }
 
       // 5. Redirección HTTP 302
       return {

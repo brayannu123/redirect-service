@@ -37,7 +37,8 @@ resource "aws_iam_role_policy" "lambda_policy" {
       },
       {
         Action = [
-          "dynamodb:GetItem"
+          "dynamodb:GetItem",
+          "dynamodb:UpdateItem"
         ]
         Effect   = "Allow"
         Resource = data.aws_dynamodb_table.urls.arn
