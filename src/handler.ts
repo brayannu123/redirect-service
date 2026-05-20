@@ -57,6 +57,15 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     }
 
     const originalUrl = response.Item.originalUrl;
+    const isResolveRequest = event.queryStringParameters?.resolve === 'true';
+
+    if (isResolveRequest) {
+      return jsonResponse(200, {
+        shortId,
+        originalUrl,
+      });
+    }
+
     const timestamp = new Date().toISOString();
 
     try {
